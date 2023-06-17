@@ -1,0 +1,8 @@
+destination: stdout
+listeners:
+  - listener_addr: "localhost:12381"
+    upstream_addr: "localhost:12380"
+  - listener_addr: "localhost:22381"
+    upstream_addr: "localhost:22380"
+  - listener_addr: "localhost:32381"
+    upstream_addr: "localhost:32380"
