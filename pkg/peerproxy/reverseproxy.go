@@ -1,10 +1,20 @@
 package peerproxy
 
 import (
+	"io"
 	"log"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"strings"
+
+	"github.com/jpittis/peerproxy/pkg/codec"
+	"go.etcd.io/etcd/client/pkg/v3/types"
+)
+
+const (
+	msgappPathPrefix  = "/raft/stream/msgapp"
+	messagePathPrefix = "/raft/stream/message"
 )
 
 type ReverseProxy struct {
@@ -29,5 +39,37 @@ func (p *ReverseProxy) ListenAndServe() error {
 }
 
 func (p *ReverseProxy) modifyResponse(resp *http.Response) (err error) {
+	r, w := io.Pipe()
+	var dec codec.Decoder
+	var enc codec.Encoder
+	if strings.HasPrefix(resp.Request.URL.Path, messagePathPrefix) {
+		dec = codec.NewMessageDecoder(resp.Body)
+		enc = codec.NewMessageEncoder(w)
+	} else if strings.HasPrefix(resp.Request.URL.Path, msgappPathPrefix) {
+		dec = codec.NewMsgAppDecoder(resp.Body, types.ID(0), types.ID(0))
+		enc = codec.NewMsgAppEncoder(w)
+	} else {
+		// Don't modify payloads for other request paths.
+		return nil
+	}
+
+	body := resp.Body
+	go func() {
+		defer body.Close()
+		for {
+			msg, err := dec.Decode()
+			if err != nil {
+				log.Printf("error: %+v", err)
+				return
+			}
+			err = enc.Encode(&msg)
+			if err != nil {
+				log.Printf("error: %+v", err)
+				return
+			}
+		}
+	}()
+	resp.Body = r
+
 	return nil
 }
