@@ -9,6 +9,14 @@ import (
 	"go.etcd.io/raft/v3/raftpb"
 )
 
+type Event struct {
+	Upstream string
+	Path     string
+	SrcID    string
+	DstID    string
+	Message  *raftpb.Message
+}
+
 func NewRecorder(destination string) (*Recorder, error) {
 	var target io.Writer
 	var file *os.File
@@ -36,10 +44,10 @@ type Recorder struct {
 	file   *os.File
 }
 
-func (r *Recorder) Record(msg *raftpb.Message) {
+func (r *Recorder) Record(event *Event) {
 	r.Lock()
 	defer r.Unlock()
-	fmt.Fprintf(r.target, "%+v\n", msg)
+	fmt.Fprintf(r.target, "%+v\n", event)
 }
 
 func (r *Recorder) Close() error {

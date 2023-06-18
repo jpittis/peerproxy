@@ -40,7 +40,25 @@ func (p *ReverseProxy) ListenAndServe() error {
 	return http.ListenAndServe(p.ln.ListenerAddr, p.reverseProxy)
 }
 
-func (p *ReverseProxy) modifyResponse(resp *http.Response) (err error) {
+func (p *ReverseProxy) modifyResponse(resp *http.Response) error {
+	// Early return (noop proxy) if this isn't a rafthttp message.
+	if !strings.HasPrefix(resp.Request.URL.Path, messagePathPrefix) &&
+		!strings.HasPrefix(resp.Request.URL.Path, messagePathPrefix) {
+		return nil
+	}
+
+	// The source of the decoded messages is the destination of the HTTP request, and the
+	// destination is the origin of the HTTP request because in rafthttp, the destination
+	// initiates the HTTP request.
+	srcID, err := types.IDFromString(resp.Request.Header.Get("X-Raft-To"))
+	if err != nil {
+		return err
+	}
+	dstID, err := types.IDFromString(resp.Request.Header.Get("X-Server-From"))
+	if err != nil {
+		return err
+	}
+
 	r, w := io.Pipe()
 	var dec codec.Decoder
 	var enc codec.Encoder
@@ -48,11 +66,9 @@ func (p *ReverseProxy) modifyResponse(resp *http.Response) (err error) {
 		dec = codec.NewMessageDecoder(resp.Body)
 		enc = codec.NewMessageEncoder(w)
 	} else if strings.HasPrefix(resp.Request.URL.Path, msgappPathPrefix) {
-		dec = codec.NewMsgAppDecoder(resp.Body, types.ID(0), types.ID(0))
+		// Decode the message as if we're the destination receiving it.
+		dec = codec.NewMsgAppDecoder(resp.Body, dstID, srcID)
 		enc = codec.NewMsgAppEncoder(w)
-	} else {
-		// Don't modify payloads for other request paths.
-		return nil
 	}
 
 	body := resp.Body
@@ -64,7 +80,13 @@ func (p *ReverseProxy) modifyResponse(resp *http.Response) (err error) {
 				log.Printf("error: %+v", err)
 				return
 			}
-			p.recorder.Record(&msg)
+			p.recorder.Record(&Event{
+				Upstream: p.ln.UpstreamAddr,
+				Path:     resp.Request.URL.Path,
+				SrcID:    srcID.String(),
+				DstID:    dstID.String(),
+				Message:  &msg,
+			})
 			err = enc.Encode(&msg)
 			if err != nil {
 				log.Printf("error: %+v", err)
