@@ -20,14 +20,16 @@ const (
 type ReverseProxy struct {
 	ln           *Listener
 	reverseProxy *httputil.ReverseProxy
+	recorder     *Recorder
 }
 
-func NewReverseProxy(ln *Listener) *ReverseProxy {
+func NewReverseProxy(ln *Listener, recorder *Recorder) *ReverseProxy {
 	target := &url.URL{Scheme: "http", Host: ln.UpstreamAddr}
 	reverseProxy := httputil.NewSingleHostReverseProxy(target)
 	p := &ReverseProxy{
 		ln:           ln,
 		reverseProxy: reverseProxy,
+		recorder:     recorder,
 	}
 	p.reverseProxy.ModifyResponse = p.modifyResponse
 	return p
@@ -62,6 +64,7 @@ func (p *ReverseProxy) modifyResponse(resp *http.Response) (err error) {
 				log.Printf("error: %+v", err)
 				return
 			}
+			p.recorder.Record(&msg)
 			err = enc.Encode(&msg)
 			if err != nil {
 				log.Printf("error: %+v", err)

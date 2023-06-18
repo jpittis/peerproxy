@@ -17,10 +17,17 @@ func NewPeerProxy(config *Config) *PeerProxy {
 
 func (p *PeerProxy) ListenAndServe() error {
 	log.Println("Starting peerpoxy with config", p.config)
+
+	recorder, err := NewRecorder(p.config.Destination)
+	if err != nil {
+		return err
+	}
+	defer recorder.Close()
+
 	var wg sync.WaitGroup
 	wg.Add(len(p.config.Listeners))
 	for _, ln := range p.config.Listeners {
-		reverseProxy := NewReverseProxy(ln)
+		reverseProxy := NewReverseProxy(ln, recorder)
 		go func() {
 			if err := reverseProxy.ListenAndServe(); err != nil {
 				log.Println(err)

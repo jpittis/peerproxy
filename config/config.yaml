@@ -1,4 +1,4 @@
-destination: stdout
+destination: stderr
 listeners:
   - listener_addr: "localhost:12381"
     upstream_addr: "localhost:12380"
