@@ -7,11 +7,13 @@ import (
 )
 
 type Config struct {
+	ClusterName string      `yaml:"cluster_name"`
 	Destination string      `yaml:"destination"`
 	Listeners   []*Listener `yaml:"listeners"`
 }
 
 type Listener struct {
+	Name         string `yaml:"name"`
 	ListenerAddr string `yaml:"listener_addr"`
 	UpstreamAddr string `yaml:"upstream_addr"`
 }

@@ -1,8 +1,12 @@
+cluster_name: "etcd-cluster-1"
 destination: stderr
 listeners:
-  - listener_addr: "localhost:12381"
+  - name: infra1
+    listener_addr: "localhost:12381"
     upstream_addr: "localhost:12380"
-  - listener_addr: "localhost:22381"
+  - name: infra2
+    listener_addr: "localhost:22381"
     upstream_addr: "localhost:22380"
-  - listener_addr: "localhost:32381"
+  - name: infra3
+    listener_addr: "localhost:32381"
     upstream_addr: "localhost:32380"
