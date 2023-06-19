@@ -43,7 +43,7 @@ func (p *ReverseProxy) ListenAndServe() error {
 func (p *ReverseProxy) modifyResponse(resp *http.Response) error {
 	// Early return (noop proxy) if this isn't a rafthttp message.
 	if !strings.HasPrefix(resp.Request.URL.Path, messagePathPrefix) &&
-		!strings.HasPrefix(resp.Request.URL.Path, messagePathPrefix) {
+		!strings.HasPrefix(resp.Request.URL.Path, msgappPathPrefix) {
 		return nil
 	}
 
