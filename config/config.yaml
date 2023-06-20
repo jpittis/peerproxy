@@ -4,9 +4,18 @@ listeners:
   - name: infra1
     listener_addr: "localhost:12381"
     upstream_addr: "localhost:12380"
+    outbound_latency:
+      infra2: 30ms
+      infra3: 30ms
   - name: infra2
     listener_addr: "localhost:22381"
     upstream_addr: "localhost:22380"
+    outbound_latency:
+      infra1: 30ms
+      infra3: 10ms
   - name: infra3
     listener_addr: "localhost:32381"
     upstream_addr: "localhost:32380"
+    outbound_latency:
+      infra1: 30ms
+      infra2: 10ms
