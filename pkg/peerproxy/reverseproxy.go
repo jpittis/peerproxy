@@ -7,6 +7,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/jpittis/peerproxy/pkg/codec"
 	"go.etcd.io/etcd/client/pkg/v3/types"
@@ -15,21 +16,30 @@ import (
 const (
 	msgappPathPrefix  = "/raft/stream/msgapp"
 	messagePathPrefix = "/raft/stream/message"
+	delayQueueSize    = 128
 )
 
 type ReverseProxy struct {
-	ln           *Listener
-	reverseProxy *httputil.ReverseProxy
-	recorder     *Recorder
+	ln                *Listener
+	reverseProxy      *httputil.ReverseProxy
+	recorder          *Recorder
+	queues            map[types.ID]*Queue
+	memberIDToNameMap map[types.ID]string
 }
 
-func NewReverseProxy(ln *Listener, recorder *Recorder) *ReverseProxy {
+func NewReverseProxy(
+	ln *Listener,
+	recorder *Recorder,
+	memberIDToNameMap map[types.ID]string,
+) *ReverseProxy {
 	target := &url.URL{Scheme: "http", Host: ln.UpstreamAddr}
 	reverseProxy := httputil.NewSingleHostReverseProxy(target)
 	p := &ReverseProxy{
-		ln:           ln,
-		reverseProxy: reverseProxy,
-		recorder:     recorder,
+		ln:                ln,
+		reverseProxy:      reverseProxy,
+		recorder:          recorder,
+		queues:            map[types.ID]*Queue{},
+		memberIDToNameMap: memberIDToNameMap,
 	}
 	p.reverseProxy.ModifyResponse = p.modifyResponse
 	return p
@@ -71,6 +81,12 @@ func (p *ReverseProxy) modifyResponse(resp *http.Response) error {
 		enc = codec.NewMsgAppEncoder(w)
 	}
 
+	queue, ok := p.queues[dstID]
+	if !ok {
+		delay := p.outboundLatencyFor(dstID)
+		queue = NewQueue(delay, delayQueueSize)
+	}
+
 	body := resp.Body
 	go func() {
 		defer body.Close()
@@ -80,21 +96,38 @@ func (p *ReverseProxy) modifyResponse(resp *http.Response) error {
 				log.Printf("error: %+v", err)
 				return
 			}
-			p.recorder.Record(&Event{
+			event := &Event{
 				Upstream: p.ln.UpstreamAddr,
 				Path:     resp.Request.URL.Path,
 				SrcID:    srcID.String(),
 				DstID:    dstID.String(),
 				Message:  &msg,
-			})
-			err = enc.Encode(&msg)
+			}
+			queue.Push(event)
+		}
+	}()
+
+	go func() {
+		for {
+			event := queue.Pop()
+			p.recorder.Record(event)
+			err = enc.Encode(event.Message)
 			if err != nil {
 				log.Printf("error: %+v", err)
 				return
 			}
 		}
 	}()
+
 	resp.Body = r
 
 	return nil
+}
+
+func (p *ReverseProxy) outboundLatencyFor(dstID types.ID) time.Duration {
+	name, ok := p.memberIDToNameMap[dstID]
+	if !ok {
+		panic("unknown member id")
+	}
+	return p.ln.OutboundLatency[name]
 }

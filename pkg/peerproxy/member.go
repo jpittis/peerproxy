@@ -7,17 +7,18 @@ import (
 	"sort"
 	"strings"
 
-	"go.etcd.io/etcd/pkg/types"
+	"go.etcd.io/etcd/client/pkg/v3/types"
 )
 
-func CalculateMemberNameToIDMap(config *Config) (map[string]types.ID, error) {
-	mapping := map[string]types.ID{}
+func CalculateMemberIDToNameMap(config *Config) (map[types.ID]string, error) {
+	mapping := map[types.ID]string{}
 	for _, ln := range config.Listeners {
 		URLs, err := types.NewURLs([]string{fmt.Sprintf("http://%s", ln.ListenerAddr)})
 		if err != nil {
 			return nil, err
 		}
-		mapping[ln.Name] = CalculateMemberID(URLs, config.ClusterName)
+		id := CalculateMemberID(URLs, config.ClusterName)
+		mapping[id] = ln.Name
 	}
 	return mapping, nil
 }

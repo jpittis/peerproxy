@@ -2,20 +2,20 @@ cluster_name: "etcd-cluster-1"
 destination: stderr
 listeners:
   - name: infra1
-    listener_addr: "localhost:12381"
-    upstream_addr: "localhost:12380"
+    listener_addr: "127.0.0.1:12381"
+    upstream_addr: "127.0.0.1:12380"
     outbound_latency:
       infra2: 30ms
       infra3: 30ms
   - name: infra2
-    listener_addr: "localhost:22381"
-    upstream_addr: "localhost:22380"
+    listener_addr: "127.0.0.1:22381"
+    upstream_addr: "127.0.0.1:22380"
     outbound_latency:
       infra1: 30ms
       infra3: 10ms
   - name: infra3
-    listener_addr: "localhost:32381"
-    upstream_addr: "localhost:32380"
+    listener_addr: "127.0.0.1:32381"
+    upstream_addr: "127.0.0.1:32380"
     outbound_latency:
       infra1: 30ms
       infra2: 10ms
